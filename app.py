@@ -99,88 +99,105 @@ def add_workout_page():
     # Second group of fields
     if st.session_state.show_exercise_details:
         st.subheader("Exercise Details")
-        col1, col2, col3 = st.columns(3)
+        if 'exercise_count' not in st.session_state:
+            st.session_state.exercise_count = 1
         
-        with col1:
-            exercise = st.selectbox("Select Exercise", 
-                                  EXERCISE_TYPES[st.session_state.form_data['workout_type']], 
-                                  key="exercise_select")
-            if exercise:
-                st.session_state.form_data['exercise'] = exercise
+        # Display input fields for each exercise
+        for idx in range(st.session_state.exercise_count):
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+            
+            with col1:
+                st.selectbox("Select Exercise", 
+                             EXERCISE_TYPES[st.session_state.form_data['workout_type']], 
+                             key=f"exercise_select_{idx}")
+            
+            with col2:
+                st.number_input("Number of Sets", 
+                                min_value=1, 
+                                value=3, 
+                                key=f"num_sets_input_{idx}")
+            
+            with col3:
+                st.number_input("Target Reps per Set", 
+                                min_value=1, 
+                                value=10, 
+                                key=f"target_reps_input_{idx}")
+            
+            with col4:
+                if st.button("Remove", key=f"remove_exercise_{idx}", on_click=lambda i=idx: remove_exercise(i)):
+                    pass
         
-        with col2:
-            num_sets = st.number_input("Number of Sets", 
-                                     min_value=1, 
-                                     value=3, 
-                                     key="num_sets_input")
-            if num_sets:
-                st.session_state.form_data['num_sets'] = num_sets
-        
-        with col3:
-            target_reps = st.number_input("Target Reps per Set", 
-                                        min_value=1, 
-                                        value=10, 
-                                        key="target_reps_input")
-            if target_reps:
-                st.session_state.form_data['target_reps'] = target_reps
+        if st.button("Add Exercise", on_click=add_exercise_callback):
+            pass
         
         # Continue button for second section
-        second_section_complete = all(key in st.session_state.form_data for key in ['exercise', 'num_sets', 'target_reps'])
-        if second_section_complete:
-            if st.button("Continue to Set Details"):
-                st.session_state.show_set_details = True
-                st.session_state.rerun = not st.session_state.rerun
+        if st.button("Continue to Set Details"):
+            st.session_state.show_set_details = True
+            st.session_state.form_data['exercises'] = []
+            for idx in range(st.session_state.exercise_count):
+                exercise_data = {
+                    "exercise": st.session_state[f"exercise_select_{idx}"],
+                    "num_sets": st.session_state[f"num_sets_input_{idx}"],
+                    "target_reps": st.session_state[f"target_reps_input_{idx}"]
+                }
+                st.session_state.form_data['exercises'].append(exercise_data)
+            st.session_state.rerun = not st.session_state.rerun
     
     # Set details section
     if st.session_state.show_set_details:
         st.subheader("Set Details")
         sets_data = []
         
-        for i in range(st.session_state.form_data['num_sets']):
-            col1, col2, col3, col4 = st.columns([1, 2, 2, 3])
-            
-            with col1:
-                st.markdown(f"**Set {i+1}**")
-            
-            with col2:
-                reps = st.number_input(f"Set {i+1} reps", 
-                                     min_value=1, 
-                                     value=st.session_state.form_data['target_reps'], 
-                                     key=f"reps_{i}")
-            
-            with col3:
-                weight = st.number_input(f"Weight (kg)", 
-                                       min_value=0, 
-                                       value=0, 
-                                       key=f"weight_{i}")
-            
-            with col4:
-                notes = st.text_input(f"Notes", key=f"notes_{i}")
-            
-            sets_data.append({
-                "set_number": i + 1,
-                "reps": reps,
-                "weight": f"{weight}kg",
-                "notes": notes
-            })
+        for exercise_info in st.session_state.form_data['exercises']:
+            exercise = exercise_info['exercise']
+            st.write(f"### {exercise}")
+            for i in range(exercise_info['num_sets']):
+                col1, col2, col3, col4 = st.columns([1, 2, 2, 3])
+                
+                with col1:
+                    st.markdown(f"**Set {i+1}**")
+                
+                with col2:
+                    reps = st.number_input(f"{exercise} Set {i+1} reps", 
+                                         min_value=1, 
+                                         value=exercise_info['target_reps'], 
+                                         key=f"reps_{exercise}_{i}")
+                
+                with col3:
+                    weight = st.number_input(f"{exercise} Weight (kg)", 
+                                           min_value=0, 
+                                           value=0, 
+                                           key=f"weight_{exercise}_{i}")
+                
+                with col4:
+                    notes = st.text_input(f"{exercise} Notes", key=f"notes_{exercise}_{i}")
+                
+                sets_data.append({
+                    "exercise": exercise,
+                    "set_number": i + 1,
+                    "reps": reps,
+                    "weight": f"{weight}kg",
+                    "notes": notes
+                })
         
         st.session_state.form_data['sets'] = sets_data
         
         # Submit button
-        if st.button("Add Exercise"):
-            workout_entry = {
-                "user": st.session_state.form_data['user'],
-                "date": st.session_state.form_data['date'].strftime("%Y-%m-%d"),
-                "workout_type": st.session_state.form_data['workout_type'],
-                "exercise": st.session_state.form_data['exercise'],
-                "target_reps": st.session_state.form_data['target_reps'],
-                "sets": st.session_state.form_data['sets'],
-                "notes": st.session_state.form_data.get('notes', '')
-            }
-            
-            st.session_state.workouts.append(workout_entry)
+        if st.button("Add Workout"):
+            for exercise_info in st.session_state.form_data['exercises']:
+                exercise = exercise_info['exercise']
+                workout_entry = {
+                    "user": st.session_state.form_data['user'],
+                    "date": st.session_state.form_data['date'].strftime("%Y-%m-%d"),
+                    "workout_type": st.session_state.form_data['workout_type'],
+                    "exercise": exercise,
+                    "target_reps": exercise_info['target_reps'],
+                    "sets": [s for s in sets_data if s['exercise'] == exercise],
+                    "notes": st.session_state.form_data.get('notes', '')
+                }
+                st.session_state.workouts.append(workout_entry)
             save_workout_data()
-            st.success("Exercise added successfully!")
+            st.success("Workout added successfully!")
             reset_form()
             st.session_state.rerun = not st.session_state.rerun
 
@@ -237,6 +254,28 @@ def view_history_page():
             save_workout_data()
             st.success("Workout removed successfully!")
             st.session_state.rerun = not st.session_state.rerun
+
+    # Add download button for backup
+    st.download_button(
+        label="Download Backup",
+        data=download_workout_data(),
+        file_name='workout_data_backup.json',
+        mime='application/json'
+    )
+
+    # Add import button for uploading JSON backup
+    uploaded_file = st.file_uploader("Upload Backup JSON", type="json")
+    if uploaded_file is not None:
+        # Read the uploaded file
+        uploaded_data = json.load(uploaded_file)
+        # Ensure the uploaded data is a list
+        if isinstance(uploaded_data, list):
+            # Replace the existing data with the uploaded data
+            st.session_state.workouts = uploaded_data
+            save_workout_data()
+            st.success("Backup imported successfully!")
+        else:
+            st.error("Invalid file format. Please upload a valid JSON backup.")
 
 def edit_workout(index):
     workout = st.session_state.workouts[index]
@@ -403,6 +442,29 @@ def insert_historical_data():
 
 # Ensure the function is not called again
 # insert_historical_data()
+
+def add_exercise_callback():
+    # Increment exercise count
+    st.session_state.exercise_count += 1
+    
+    # Initialize session state for the new exercise
+    idx = st.session_state.exercise_count - 1
+    if f"exercise_select_{idx}" not in st.session_state:
+        st.session_state[f"exercise_select_{idx}"] = EXERCISE_TYPES[st.session_state.form_data['workout_type']][0]
+    if f"num_sets_input_{idx}" not in st.session_state:
+        st.session_state[f"num_sets_input_{idx}"] = 3
+    if f"target_reps_input_{idx}" not in st.session_state:
+        st.session_state[f"target_reps_input_{idx}"] = 10
+
+def remove_exercise(idx):
+    st.session_state.exercise_count -= 1
+    del st.session_state[f"exercise_select_{idx}"]
+    del st.session_state[f"num_sets_input_{idx}"]
+    del st.session_state[f"target_reps_input_{idx}"]
+
+def download_workout_data():
+    """Prepare workout data for download"""
+    return json.dumps(st.session_state.workouts, indent=4)
 
 if __name__ == "__main__":
     main() 
